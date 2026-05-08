@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>❤️ 给我最爱的你</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 25%, #ffecd2 50%, #fcb69f 75%, #ffecd2 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            overflow: hidden;
+            font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer;
+        }
+
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #8b0040;
+            font-size: 18px;
+            z-index: 100;
+            text-shadow: 0 0 10px rgba(255, 105, 180, 0.5);
+            animation: pulseHint 2s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes pulseHint {
+            0%, 100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+
+        .message-text {
+            position: fixed;
+            font-size: 20px;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 50;
+            white-space: nowrap;
+            font-family: 'KaiTi', 'STKaiti', 'Microsoft YaHei', cursive;
+            animation: messageAppear 0.5s ease-out forwards;
+        }
+
+        @keyframes messageAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.8) translateY(20px);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes messageFade {
+            0% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="mainCanvas"></canvas>
+    <div class="hint">点击屏幕任意位置，有惊喜等你哦~</div>
+
+    <script>
+        const sweetMessages = [
+            '你是我的小太阳！☀️',
+            '今天也想见到你！💕',
+            '可爱不是长久之计，可爱你是长久之计！🥰',
+            '宝贝你最美！💖',
+            '我爱你！❤️',
+            '你是我的唯一！💗',
+            '遇见你真好！🌸',
+            '想你了！💝',
+            '你笑起来真好看！😊',
+            '余生都是你！✨',
+            '我超级喜欢你！🥰',
+            '永远爱你！💞',
+            '有你真好！💕',
+            '你最可爱！😘',
+            '我的心属于你！💓',
+            '每天都想你！💗',
+            '你是我的全世界！🌍',
+            '喜欢你这件事，我从未犹豫过！💖'
+        ];
+
+        function getRandomSubset(arr, min, max) {
+            const shuffled = [...arr].sort(() => 0.5 - Math.random());
+            const count = Math.floor(Math.random() * (max - min + 1)) + min;
+            return shuffled.slice(0, count);
+        }
+
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        let meteors = [];
+        let stars = [];
+        let heartParticles = [];
+
+        class Star {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.radius = Math.random() * 2 + 0.5;
+                this.alpha = Math.random() * 0.5 + 0.3;
+                this.twinkleSpeed = Math.random() * 0.02 + 0.01;
+                this.twinklePhase = Math.random() * Math.PI * 2;
+            }
+
+            update() {
+                this.twinklePhase += this.twinkleSpeed;
+                this.currentAlpha = this.alpha + Math.sin(this.twinklePhase) * 0.3;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.currentAlpha})`;
+                ctx.fill();
+            }
+        }
+
+        class Meteor {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height * 0.3;
+                this.length = Math.random() * 80 + 100;
+                this.speed = Math.random() * 5 + 3;
+                this.angle = Math.PI / 4 + (Math.random() - 0.5) * 0.5;
+                this.alpha = 1;
+                this.brightness = Math.random() * 0.5 + 0.5;
+                this.headRadius = Math.random() * 2 + 2;
+            }
+
+            update() {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.alpha -= 0.002;
+            }
+
+            isDead() {
+                return this.alpha <= 0 || this.x > width + 100 || this.y > height + 100;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.angle);
+                
+                const gradient = ctx.createLinearGradient(-this.length, 0, 0, 0);
+                gradient.addColorStop(0, `rgba(255, 255, 255, 0)`);
+                gradient.addColorStop(0.3, `rgba(255, 255, 255, ${0.2 * this.alpha * this.brightness})`);
+                gradient.addColorStop(0.7, `rgba(255, 255, 255, ${0.7 * this.alpha * this.brightness})`);
+                gradient.addColorStop(1, `rgba(255, 255, 255, ${this.alpha * this.brightness})`);
+
+                ctx.beginPath();
+                ctx.strokeStyle = gradient;
+                ctx.lineWidth = 2;
+                ctx.moveTo(-this.length, 0);
+                ctx.lineTo(0, 0);
+                ctx.stroke();
+
+                const headGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.headRadius * 3);
+                headGradient.addColorStop(0, `rgba(255, 255, 255, ${this.alpha * this.brightness})`);
+                headGradient.addColorStop(0.3, `rgba(255, 200, 255, ${0.6 * this.alpha * this.brightness})`);
+                headGradient.addColorStop(0.6, `rgba(255, 150, 200, ${0.3 * this.alpha * this.brightness})`);
+                headGradient.addColorStop(1, `rgba(255, 100, 180, 0)`);
+
+                ctx.beginPath();
+                ctx.fillStyle = headGradient;
+                ctx.arc(0, 0, this.headRadius * 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(255, 255, 255, ${this.alpha * this.brightness})`;
+                ctx.arc(0, 0, this.headRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        class HeartParticle {
+            constructor(centerX, centerY, targetX, targetY, delay) {
+                this.centerX = centerX;
+                this.centerY = centerY;
+                this.x = centerX;
+                this.y = centerY;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.delay = delay;
+                this.progress = 0;
+                this.alpha = 1;
+                this.radius = Math.random() * 2 + 1.5;
+                this.hue = 340 + Math.random() * 40;
+                this.fadeStart = 2.5;
+                this.fadeDuration = 3;
+            }
+
+            update(deltaTime) {
+                this.progress += deltaTime;
+                if (this.progress > this.delay) {
+                    const animationProgress = Math.min((this.progress - this.delay) / 1, 1);
+                    this.x = this.centerX + (this.targetX - this.centerX) * animationProgress;
+                    this.y = this.centerY + (this.targetY - this.centerY) * animationProgress;
+                }
+
+                if (this.progress > this.fadeStart) {
+                    const fadeProgress = (this.progress - this.fadeStart) / this.fadeDuration;
+                    this.alpha = Math.max(0, 1 - fadeProgress);
+                }
+            }
+
+            isDead() {
+                return this.alpha <= 0;
+            }
+
+            draw() {
+                if (this.progress < this.delay) return;
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${this.hue}, 100%, 70%, ${this.alpha})`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius * 2, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${this.hue}, 100%, 70%, ${this.alpha * 0.3})`;
+                ctx.fill();
+            }
+        }
+
+        function getHeartPoints(centerX, centerY, scale) {
+            const points = [];
+            const steps = 100;
+            
+            for (let t = 0; t <= Math.PI * 2; t += Math.PI * 2 / steps) {
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                points.push({
+                    x: centerX + x * scale,
+                    y: centerY - y * scale
+                });
+            }
+            
+            return points;
+        }
+
+        function getHeartFillPoints(centerX, centerY, scale, density) {
+            const points = [];
+            
+            for (let i = 0; i < density; i++) {
+                const t = Math.random() * Math.PI * 2;
+                const r = Math.random() * 0.85 + 0.15;
+                
+                const hx = 16 * Math.pow(Math.sin(t), 3);
+                const hy = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                
+                points.push({
+                    x: centerX + hx * scale * r,
+                    y: centerY - hy * scale * r
+                });
+            }
+            
+            return points;
+        }
+
+        function createHeartAtPosition(x, y) {
+            const scale = 10;
+            const heartPoints = getHeartPoints(x, y, scale);
+            const fillPoints = getHeartFillPoints(x, y, scale, 80);
+            
+            heartPoints.forEach((point) => {
+                const delay = Math.random() * 0.3;
+                heartParticles.push(new HeartParticle(x, y, point.x, point.y, delay));
+            });
+
+            fillPoints.forEach((point) => {
+                const delay = 0.3 + Math.random() * 0.4;
+                heartParticles.push(new HeartParticle(x, y, point.x, point.y, delay));
+            });
+
+            const selectedMessages = getRandomSubset(sweetMessages, 2, 5);
+            
+            selectedMessages.forEach((msg, index) => {
+                const angle = ((index / selectedMessages.length) * Math.PI - Math.PI / 2) + Math.PI / 4;
+                const distance = 100 + Math.random() * 50;
+                const posX = x + Math.cos(angle) * distance * (index % 2 === 0 ? 1 : 0.6);
+                const posY = y - 80 - index * 35;
+                
+                createMessageElement(msg, posX, posY, index * 0.2);
+            });
+        }
+
+        function createMessageElement(text, x, y, delay) {
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message-text';
+            messageEl.textContent = text;
+            messageEl.style.left = x + 'px';
+            messageEl.style.top = y + 'px';
+            messageEl.style.color = '#ffffff';
+            messageEl.style.textShadow = '0 0 10px #ff69b4, 0 0 20px #ff1493, 0 0 30px #ff69b4';
+            messageEl.style.animationDelay = delay + 's';
+            
+            document.body.appendChild(messageEl);
+
+            setTimeout(() => {
+                messageEl.style.animation = 'messageFade 1s ease-out forwards';
+                setTimeout(() => {
+                    messageEl.remove();
+                }, 1000);
+            }, 3500 + delay * 1000);
+        }
+
+        function resizeCanvas() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 60; i++) {
+                stars.push(new Star());
+            }
+        }
+
+        function addMeteor() {
+            meteors.push(new Meteor());
+        }
+
+        let lastTime = 0;
+        function animate(currentTime) {
+            if (lastTime === 0) lastTime = currentTime;
+            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
+            lastTime = currentTime;
+
+            ctx.clearRect(0, 0, width, height);
+
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            meteors = meteors.filter(meteor => {
+                meteor.update();
+                if (!meteor.isDead()) {
+                    meteor.draw();
+                    return true;
+                }
+                return false;
+            });
+
+            heartParticles = heartParticles.filter(particle => {
+                particle.update(deltaTime);
+                if (!particle.isDead()) {
+                    particle.draw();
+                    return true;
+                }
+                return false;
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        function scheduleMeteors() {
+            addMeteor();
+            const delay = 500 + Math.random() * 1500;
+            setTimeout(scheduleMeteors, delay);
+        }
+
+        document.addEventListener('click', function(e) {
+            const clickX = e.clientX;
+            const clickY = e.clientY;
+            createHeartAtPosition(clickX, clickY);
+        });
+
+        resizeCanvas();
+        initStars();
+        animate();
+        scheduleMeteors();
+        setTimeout(scheduleMeteors, 800);
+        setTimeout(scheduleMeteors, 1600);
+
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+    </script>
+</body>
+</html>
